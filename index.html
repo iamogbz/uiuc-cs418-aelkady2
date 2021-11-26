@@ -1,5 +1,5 @@
-<!DOCTYPE HTML> 
-<html> 
+<!DOCTYPE HTML>
+<html>
 
 <script src="unit teapot.js"></script>
 
@@ -61,7 +61,7 @@ var fs = `#version 300 es
 #endif
 
 precision mediump float;
-    
+
 in vec3 vNormal;
 in vec3 vPosition;
 in vec3 normal;
@@ -70,35 +70,49 @@ uniform sampler2D uSampler;
 uniform sampler2D uSampler2;
 
 out vec4 outColor;
-    
+
 void main() {
   vec2 illinoisTexCoord;
-  illinoisTexCoord.s = 1.0-((atan(vPosition.z, vPosition.x))/(2.0*M_PI));
-  illinoisTexCoord.t = (vPosition.y+0.25)/0.5;
-  vec2 stadiumTexCoord = (normal.xy + 1.0)/2.0;
+  illinoisTexCoord.s = 1.0 - ((atan(vPosition.z, vPosition.x)) / (2.0 * M_PI));
+  illinoisTexCoord.t = (vPosition.y + 0.25) / 0.5;
+  vec2 stadiumTexCoord = (normal.xy + 1.0) / 2.0;
   vec4 illinois = TEXTURE2D(uSampler, illinoisTexCoord);
   vec4 stadium = TEXTURE2D(uSampler2, stadiumTexCoord);
 
   vec3 normalizedNormal = normalize(normal);
-  vec3 lighting;
 
   float ks = 0.6;
-  vec3 specularLightSourceLocation = vec3(1.5,4.0,4.0);
+  vec3 specularColor = vec3(1, 1, 1);
+  vec3 specularLightSourceLocation = vec3(8.0, 6.0, 4.0);
   vec3 specularLightDirection = normalize(specularLightSourceLocation - modelViewPosition.xyz);
   vec3 eyeDirection = normalize(-modelViewPosition.xyz);
   vec3 specularReflectionDirection = reflect(-specularLightDirection, normalizedNormal);
   float specularLightComponent = pow(max(dot(specularReflectionDirection, eyeDirection), 0.0), 40.0);
+  vec3 specularLight = ks * specularColor * specularLightComponent;
 
-  float kd = 0.8;
-  vec3 diffuseLightSourceLocation = vec3(2.0,1.0,3.0);
+  float kd = 0.6;
+  vec3 diffuseColor = vec3(1, 1, 1);
+  vec3 diffuseLightSourceLocation = vec3(2.0, 1.0, 3.0);
   vec3 diffuseLightDirection = normalize(diffuseLightSourceLocation - modelViewPosition.xyz);
   float diffuseLightComponent = max(dot(normalizedNormal, diffuseLightDirection), 0.0);
+  vec3 diffuseLight = kd * diffuseColor * diffuseLightComponent;
 
-  vec3 specularColor = vec3(0.5, 0.5, 0.5);
-  vec3 diffuseColor = vec3(0.75, 0.75, 0.75);
-  lighting = ks * specularColor * specularLightComponent + kd * diffuseColor * diffuseLightComponent;
+  vec3 lighting = specularLight + diffuseLight;
 
-  vec4 fragmentColor = (illinois + stadium);
+  // simulate bump map using decal texture
+  float kr = 2.0;
+  float magn = smoothstep(0.5, 1.0, length(illinois.rgb) / sqrt(3.0));
+  vec3 bump = vec3(magn, magn, magn);
+  vec4 reflection = vec4(stadium.rgb * bump * kr, stadium.a);
+
+  // exclude parts of decal texture that tend to white
+  // still has the artifacting need to solve that with some blur
+  float kt = 1.0;
+  float masq = 1.0 - smoothstep(0.6, 1.0, length(illinois.rgb) / sqrt(3.0));
+  vec3 mask = vec3(masq, masq, masq);
+  vec4 decal = vec4(illinois.rgb * mask * kt, masq);
+
+  vec4 fragmentColor = (decal + reflection);
   vec4 c = vec4(fragmentColor.rgb * lighting, fragmentColor.a);
 
   outColor = c;
@@ -123,13 +137,13 @@ function initwebgl() {
   loadshaders(vs,fs);
 
   // set up vertex array object
- 
+
   teapot_vao = gl.createVertexArray();
   gl.bindVertexArray(teapot_vao);
 
   // create a coordinate buffer of vertex positions and
   // connect it to the vertex shader positions
- 
+
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
   gl.bufferData(gl.ARRAY_BUFFER,
                 new Float32Array(teapot.positions),
@@ -153,7 +167,7 @@ function initwebgl() {
     teapot.normals[i] *= d;
     teapot.normals[i+1] *= d;
     teapot.normals[i+2] *= d;
-    
+
   }
 
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
@@ -166,7 +180,7 @@ function initwebgl() {
 
   // create an index buffer of triangle faces
 
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer()); 
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
                 new Uint16Array(teapot.faces),
                 gl.STATIC_DRAW);
@@ -192,6 +206,7 @@ function initwebgl() {
 
   var image = new Image();
   image.src = "illinois512.png";
+  // image.src = "illinois512-transparent.png";
 
   image.addEventListener("load", function() {
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -267,11 +282,11 @@ function loadshaders(vertexShaderSource,fragmentShaderSource) {
 
   vert_pos_attr = gl.getAttribLocation(shaderProgram, "aVertexPosition");
   vert_normal_attr = gl.getAttribLocation(shaderProgram, "aVertexNormal");
-  modelview_uniform = gl.getUniformLocation(shaderProgram, "uModelViewMatrix"); 
-  normal_uniform = gl.getUniformLocation(shaderProgram, "uNormalMatrix"); 
-  projection_uniform = gl.getUniformLocation(shaderProgram, "uProjectionMatrix"); 
-  sampler_uniform = gl.getUniformLocation(shaderProgram, "uSampler"); 
-  sampler2_uniform = gl.getUniformLocation(shaderProgram, "uSampler2"); 
+  modelview_uniform = gl.getUniformLocation(shaderProgram, "uModelViewMatrix");
+  normal_uniform = gl.getUniformLocation(shaderProgram, "uNormalMatrix");
+  projection_uniform = gl.getUniformLocation(shaderProgram, "uProjectionMatrix");
+  sampler_uniform = gl.getUniformLocation(shaderProgram, "uSampler");
+  sampler2_uniform = gl.getUniformLocation(shaderProgram, "uSampler2");
 }
 
 //
@@ -288,6 +303,7 @@ function draw(time) {
   modelview = glMatrix.mat4.create();
   glMatrix.mat4.translate(modelview,modelview,[0.0, 0.0, -2.0]);
   glMatrix.mat4.rotateY(modelview,modelview, time*0.001);
+  // glMatrix.mat4.rotateY(modelview,modelview, 3.6);
 
   normalmatrix = glMatrix.mat3.create();
   glMatrix.mat3.normalFromMat4(normalmatrix,modelview);
